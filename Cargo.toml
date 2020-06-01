@@ -1,0 +1,19 @@
+[package]
+name = "small_loadbalancer"
+version = "0.1.0"
+authors = ["Andrzej J Skalski <gitstuff@s5i.ch>"]
+edition = "2018"
+
+[dependencies]
+rocket = "0.4.5"
+clap = { version = "2.33", features = ["yaml"] }
+reqwest = { version = "0.10", features = ["blocking", "json"] }
+rand = "0.7.3"
+
+[[bin]]
+name = "provider"
+path = "src/provider.rs"
+
+[[bin]]
+name = "load_balancer"
+path = "src/load_balancer.rs"

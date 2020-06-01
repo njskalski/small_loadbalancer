@@ -1,0 +1,26 @@
+name: provider
+about: simple data provider for load-balancing example
+
+settings:
+  - ColorAuto
+  - InferSubcommands
+
+args:
+  - port:
+      short: p
+      long: port
+      takes_value: true
+      required: true
+      help: Port on which the load_balancer listens to requests.
+  - instances:
+      short: i
+      long: instances
+      takes_value: true
+      required: true
+      help: List of coma separated host:port pairs of instances.
+  - algorithm:
+      short: a
+      long: algorithm
+      takes_value: true
+      possible_values: [random, round_robin]
+      default_value: random
