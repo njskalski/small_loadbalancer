@@ -24,3 +24,9 @@ args:
       takes_value: true
       possible_values: [random, round_robin]
       default_value: random
+  - healthcheck-delay:
+      short: x
+      long: healthcheck-delay
+      takes_value: true
+      default_value: "2"
+      help: Delay between consecutive healthchecks in seconds.
