@@ -30,3 +30,9 @@ args:
       takes_value: true
       default_value: "2"
       help: Delay between consecutive healthchecks in seconds.
+  - provider-capacity:
+      short: c
+      long: provider-capacity
+      takes_value: true
+      default_value: "5"
+      help: Maximum simultaneous requests per provider-instance

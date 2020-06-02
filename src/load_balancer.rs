@@ -10,15 +10,14 @@ use rocket::State;
 use std::process::exit;
 
 mod load_balancer_types;
-use crate::load_balancer_types::Algorithm;
+use crate::load_balancer_types::{Algorithm, RequestCounter};
 use crate::load_balancer_types::Algorithm::{RANDOM, ROUND_ROBIN};
 use load_balancer_types::{Instance, LoadBalancerState};
 
 use reqwest::blocking::Response;
-use std::borrow::Borrow;
-use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use rocket::http::Status;
 
 const MAX_INSTANCES: usize = 10;
 
@@ -43,15 +42,37 @@ fn check_instance_health(instance: &Instance) -> bool {
 }
 
 #[get("/get")]
-fn get(state_lock: State<LoadBalancerStateType>) -> String {
-    let instance: Instance = {
+fn get(state_lock: State<LoadBalancerStateType>, request_counter: State<Arc<RequestCounter>>) -> Result<String, Status> {
+    let instance_op: Option<Instance> = {
         let mut state = state_lock.write().unwrap();
+
+        if request_counter.get_num_requests() > state.current_capacity() {
+            eprintln!("Balancer capacity reached.");
+            return Err(Status::new(503, "Capacity limit reached"))
+        } else {
+            eprintln!("{} / {} open requests.", request_counter.get_num_requests(), state.current_capacity());
+        }
+
         state.get_next_instance()
     };
 
-    let answer = forward_request(&instance);
+    match instance_op {
+        None => {
+            eprintln!("No instances available.");
+            Err(Status::new(500, "No instances available"))
+        }
+        Some(instance) => {
+            let answer = forward_request(&instance);
 
-    format!("a : {:#?}", answer)
+            match answer {
+                Err(e) => {
+                    eprintln!("Failure receiving answer from instance, error \"{}\"", e);
+                    Err(Status::new(500, "Backend instance failed."))
+                }
+                Ok(s) => Ok(s)
+            }
+        }
+    }
 }
 
 #[get("/state")]
@@ -63,7 +84,7 @@ fn get_state(state_lock: State<LoadBalancerStateType>) -> String {
 #[get("/include/<idx>")]
 fn include(state_lock: State<LoadBalancerStateType>, idx : usize) -> String {
     let instances : Vec<Instance> = {
-        let mut state = state_lock.read().unwrap();
+        let state = state_lock.read().unwrap();
         state.instances().clone()
     };
 
@@ -89,7 +110,7 @@ fn include(state_lock: State<LoadBalancerStateType>, idx : usize) -> String {
 #[get("/exclude/<idx>")]
 fn exclude(state_lock: State<LoadBalancerStateType>, idx : usize) -> String {
     let instance_num : usize = {
-        let mut state = state_lock.read().unwrap();
+        let state = state_lock.read().unwrap();
         state.instances().len()
     };
 
@@ -193,6 +214,18 @@ fn main() {
         }
     };
 
+    let per_instance_limit_str = matches.value_of("provider-capacity").unwrap();
+    let per_instance_limit: u32 = match per_instance_limit_str.parse::<u32>() {
+        Ok(s) => s,
+        Err(e) => {
+            println!(
+                "Failed to parse provider-capacity parameter, got \"{}\" and error is \"{}\"",
+                per_instance_limit_str, e
+            );
+            exit(6)
+        }
+    };
+
     let config = match Config::build(Environment::Staging).port(port).finalize() {
         Ok(config) => config,
         Err(e) => {
@@ -202,9 +235,9 @@ fn main() {
     };
 
     let state: LoadBalancerStateType =
-        Arc::new(RwLock::new(LoadBalancerState::new(instances, algorithm)));
+        Arc::new(RwLock::new(LoadBalancerState::new(instances, algorithm, per_instance_limit)));
     let state2 = state.clone(); // cloning Arc
-    let child = std::thread::spawn(move || loop {
+    let _child = std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(healthcheck_delay_s));
 
         let instances: Vec<Instance> = {
@@ -231,8 +264,12 @@ fn main() {
         }
     });
 
+    let request_counter_arc = Arc::new(RequestCounter::new());
+
     rocket::custom(config)
         .manage(state)
+        .manage(request_counter_arc.clone())
+        .attach(request_counter_arc)
         .mount("/", routes![get, get_state, include, exclude])
         .launch();
 }
