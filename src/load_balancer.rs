@@ -28,7 +28,7 @@ fn forward_request(instance: &Instance) -> Result<String, Box<dyn std::error::Er
     let resp: Response = reqwest::blocking::get(&address)?;
     let resp_as_text: String = resp.text()?;
 
-    Ok(format!("got {}", resp_as_text))
+    Ok(resp_as_text)
 }
 
 fn check_instance_health(instance: &Instance) -> bool {
