@@ -10,14 +10,14 @@ use rocket::State;
 use std::process::exit;
 
 mod load_balancer_types;
-use crate::load_balancer_types::{Algorithm, RequestCounter};
 use crate::load_balancer_types::Algorithm::{RANDOM, ROUND_ROBIN};
+use crate::load_balancer_types::{Algorithm, RequestCounter};
 use load_balancer_types::{Instance, LoadBalancerState};
 
 use reqwest::blocking::Response;
+use rocket::http::Status;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use rocket::http::Status;
 
 const MAX_INSTANCES: usize = 10;
 
@@ -42,15 +42,22 @@ fn check_instance_health(instance: &Instance) -> bool {
 }
 
 #[get("/get")]
-fn get(state_lock: State<LoadBalancerStateType>, request_counter: State<Arc<RequestCounter>>) -> Result<String, Status> {
+fn get(
+    state_lock: State<LoadBalancerStateType>,
+    request_counter: State<Arc<RequestCounter>>,
+) -> Result<String, Status> {
     let instance_op: Option<Instance> = {
         let mut state = state_lock.write().unwrap();
 
         if request_counter.get_num_requests() > state.current_capacity() {
             eprintln!("Balancer capacity reached.");
-            return Err(Status::new(503, "Capacity limit reached"))
+            return Err(Status::new(503, "Capacity limit reached"));
         } else {
-            eprintln!("{} / {} open requests.", request_counter.get_num_requests(), state.current_capacity());
+            eprintln!(
+                "{} / {} open requests.",
+                request_counter.get_num_requests(),
+                state.current_capacity()
+            );
         }
 
         state.get_next_instance()
@@ -69,7 +76,7 @@ fn get(state_lock: State<LoadBalancerStateType>, request_counter: State<Arc<Requ
                     eprintln!("Failure receiving answer from instance, error \"{}\"", e);
                     Err(Status::new(500, "Backend instance failed."))
                 }
-                Ok(s) => Ok(s)
+                Ok(s) => Ok(s),
             }
         }
     }
@@ -82,21 +89,26 @@ fn get_state(state_lock: State<LoadBalancerStateType>) -> String {
 }
 
 #[get("/include/<idx>")]
-fn include(state_lock: State<LoadBalancerStateType>, idx : usize) -> String {
-    let instances : Vec<Instance> = {
+fn include(state_lock: State<LoadBalancerStateType>, idx: usize) -> String {
+    let instances: Vec<Instance> = {
         let state = state_lock.read().unwrap();
         state.instances().clone()
     };
 
     if idx > instances.len() {
-        return format!("Incorrect index {}, tracking only {} instances.", idx, instances.len()).to_string();
+        return format!(
+            "Incorrect index {}, tracking only {} instances.",
+            idx,
+            instances.len()
+        )
+        .to_string();
     }
 
     let instance = &instances[idx];
     let health = check_instance_health(instance);
 
     if !health {
-        return format!("Unable to include instance #{}, failed health check.", idx, ).to_string();
+        return format!("Unable to include instance #{}, failed health check.", idx,).to_string();
     }
 
     {
@@ -108,14 +120,18 @@ fn include(state_lock: State<LoadBalancerStateType>, idx : usize) -> String {
 }
 
 #[get("/exclude/<idx>")]
-fn exclude(state_lock: State<LoadBalancerStateType>, idx : usize) -> String {
-    let instance_num : usize = {
+fn exclude(state_lock: State<LoadBalancerStateType>, idx: usize) -> String {
+    let instance_num: usize = {
         let state = state_lock.read().unwrap();
         state.instances().len()
     };
 
     if idx > instance_num {
-        return format!("Incorrect index {}, tracking only {} instances.", idx, instance_num).to_string();
+        return format!(
+            "Incorrect index {}, tracking only {} instances.",
+            idx, instance_num
+        )
+        .to_string();
     }
 
     {
@@ -234,8 +250,11 @@ fn main() {
         }
     };
 
-    let state: LoadBalancerStateType =
-        Arc::new(RwLock::new(LoadBalancerState::new(instances, algorithm, per_instance_limit)));
+    let state: LoadBalancerStateType = Arc::new(RwLock::new(LoadBalancerState::new(
+        instances,
+        algorithm,
+        per_instance_limit,
+    )));
     let state2 = state.clone(); // cloning Arc
     let _child = std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(healthcheck_delay_s));

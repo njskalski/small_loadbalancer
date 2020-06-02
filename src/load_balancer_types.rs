@@ -1,8 +1,8 @@
 use rand::Rng;
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::{Request, Data, Response};
-use std::sync::atomic::Ordering;
+use rocket::{Data, Request, Response};
 use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Algorithm {
@@ -28,17 +28,17 @@ impl Instance {
 #[derive(Debug)]
 pub struct LoadBalancerState {
     instances: Vec<Instance>,
-    is_enabled : Vec<bool>,
-    consecutive_health_ok : Vec<u8>, // I store history of up to 255 health checks.
+    is_enabled: Vec<bool>,
+    consecutive_health_ok: Vec<u8>, // I store history of up to 255 health checks.
     algorithm: Algorithm,
     round_robin_idx: usize,
-    per_instance_capacity : u32
+    per_instance_capacity: u32,
 }
 
 impl LoadBalancerState {
-    pub fn new(instances: Vec<Instance>, algorithm: Algorithm, per_instance_capacity : u32) -> Self {
-        let is_enabled : Vec<bool> = instances.iter().map(|_| true).collect();
-        let consecutive_health_ok : Vec<u8> = instances.iter().map( |_| 0).collect();
+    pub fn new(instances: Vec<Instance>, algorithm: Algorithm, per_instance_capacity: u32) -> Self {
+        let is_enabled: Vec<bool> = instances.iter().map(|_| true).collect();
+        let consecutive_health_ok: Vec<u8> = instances.iter().map(|_| 0).collect();
 
         LoadBalancerState {
             instances,
@@ -46,12 +46,12 @@ impl LoadBalancerState {
             consecutive_health_ok,
             algorithm,
             round_robin_idx: 0,
-            per_instance_capacity
+            per_instance_capacity,
         }
     }
 
     pub fn current_capacity(&self) -> u32 {
-        let mut result : u32 = 0;
+        let mut result: u32 = 0;
         for it in self.is_enabled.iter() {
             if *it {
                 result += 1;
@@ -67,7 +67,7 @@ impl LoadBalancerState {
     }
 
     pub fn get_next_instance(&mut self) -> Option<Instance> {
-        let mut is_any_enabled : bool = false;
+        let mut is_any_enabled: bool = false;
 
         for value in self.is_enabled.iter() {
             if *value {
@@ -82,7 +82,7 @@ impl LoadBalancerState {
 
         match self.algorithm {
             Algorithm::RANDOM => {
-                let mut enabled_indices : Vec<usize> = Vec::new();
+                let mut enabled_indices: Vec<usize> = Vec::new();
 
                 for (idx, is_enabled) in self.is_enabled.iter().enumerate() {
                     if *is_enabled {
@@ -110,7 +110,7 @@ impl LoadBalancerState {
                     self.round_robin_idx = next_idx;
 
                     if self.is_enabled[idx] {
-                        return Some(self.instances[idx].clone())
+                        return Some(self.instances[idx].clone());
                     }
                 }
             }
@@ -119,7 +119,8 @@ impl LoadBalancerState {
 
     pub fn report_healthcheck_results(&mut self, results: Vec<bool>) {
         assert_eq!(results.len(), self.instances.len());
-        println!("health check results : {:?}", results);
+        println!("health check results\t : {:?}", results);
+        println!("enabled\t\t\t : {:?}", self.is_enabled);
 
         for (idx, health_ok) in results.iter().enumerate() {
             if *health_ok {
@@ -140,21 +141,22 @@ impl LoadBalancerState {
         }
     }
 
-    pub fn set_enabled(&mut self, idx : usize, enabled : bool) {
+    pub fn set_enabled(&mut self, idx: usize, enabled: bool) {
         assert!(idx < self.instances.len());
         self.is_enabled[idx] = enabled;
+        self.consecutive_health_ok[idx] = 0; //otherwise get's reinitialized immidiately
     }
 }
 
 #[derive(Debug)]
 pub struct RequestCounter {
-    num_request : AtomicU32
+    num_request: AtomicU32,
 }
 
 impl RequestCounter {
     pub fn new() -> Self {
-        RequestCounter{
-            num_request : AtomicU32::new(0)
+        RequestCounter {
+            num_request: AtomicU32::new(0),
         }
     }
 
@@ -167,7 +169,7 @@ impl Fairing for RequestCounter {
     fn info(&self) -> Info {
         Info {
             name: "Request Counter",
-            kind: Kind::Request | Kind::Response
+            kind: Kind::Request | Kind::Response,
         }
     }
 
