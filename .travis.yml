@@ -1,0 +1,10 @@
+dist: bionic
+addons:
+  apt:
+    - libssl-dev
+
+language: rust
+rust:
+  - nightly
+script:
+  - cargo build
