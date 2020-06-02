@@ -7,13 +7,18 @@ sudo apt instal libssl-dev
 3) Select rust nightly
 rustup default nightly
 5) Build & run
-./run sh
+./run.sh
+6) You might need apache2-utils for testing
+sudo apt install apache2-utils
 
 Interface:
 Since time was limited, I implemented simplistic REST interface.
 localhost:8000/exclude/<i> will exclude instance #i (0 based)
 localhost:8000/include/<i> will re-include this instance.
 Heartbeat check will re-include any healthy instance automatically, as in problem statement.
+
+localhost:8000/get is the get() method described in problem statement.
+localhost:8000/status offers a serialized version of load_balancer status structure.
 
 How to test:
 The script starts a load_balancer along with 10 providers.
@@ -36,5 +41,5 @@ Time taken for tests:   0.171 seconds
 Complete requests:      1000
 Failed requests:        834
 
-There is much more failed requests are these happen significantly faster than successful ones, that block one handler
-for IO with provider.
+There is much more failed requests are these happen significantly faster than successful ones.
+

@@ -144,7 +144,9 @@ impl LoadBalancerState {
     pub fn set_enabled(&mut self, idx: usize, enabled: bool) {
         assert!(idx < self.instances.len());
         self.is_enabled[idx] = enabled;
-        self.consecutive_health_ok[idx] = 0; //otherwise get's reinitialized immidiately
+        if !enabled {
+            self.consecutive_health_ok[idx] = 0; //otherwise get's reinitialized immidiately
+        }
     }
 }
 
